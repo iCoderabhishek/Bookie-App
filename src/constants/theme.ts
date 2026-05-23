@@ -1,26 +1,35 @@
-/**
- * Below are the colors that are used in the app. The colors are defined in the light and dark mode.
- * There are many other ways to style your app. For example, [Nativewind](https://www.nativewind.dev/), [Tamagui](https://tamagui.dev/), [unistyles](https://reactnativeunistyles.vercel.app), etc.
- */
-
 import '@/global.css';
 
 import { Platform } from 'react-native';
 
 export const Colors = {
   light: {
-    text: '#000000',
-    background: '#ffffff',
-    backgroundElement: '#F0F0F3',
-    backgroundSelected: '#E0E1E6',
-    textSecondary: '#60646C',
+    text: '#1A1118',
+    textSecondary: '#6B5D5A',
+    textOnPrimary: '#FFFFFF',
+    background: '#FFF4EA',
+    backgroundElement: '#FFE4D1',
+    backgroundSelected: '#FFD1B0',
+    border: '#F0D5BC',
+    primary: '#FF6B6B',
+    accent: '#A78BFA',
+    success: '#22C55E',
+    danger: '#EF4444',
+    warning: '#F59E0B',
   },
   dark: {
-    text: '#ffffff',
-    background: '#000000',
-    backgroundElement: '#212225',
-    backgroundSelected: '#2E3135',
-    textSecondary: '#B0B4BA',
+    text: '#FFF4EA',
+    textSecondary: '#B0A4A8',
+    textOnPrimary: '#1A1118',
+    background: '#0F0B14',
+    backgroundElement: '#1F1822',
+    backgroundSelected: '#2D2532',
+    border: '#2A2230',
+    primary: '#FF8E72',
+    accent: '#C4B5FD',
+    success: '#4ADE80',
+    danger: '#F87171',
+    warning: '#FBBF24',
   },
 } as const;
 
@@ -28,13 +37,9 @@ export type ThemeColor = keyof typeof Colors.light & keyof typeof Colors.dark;
 
 export const Fonts = Platform.select({
   ios: {
-    /** iOS `UIFontDescriptorSystemDesignDefault` */
     sans: 'system-ui',
-    /** iOS `UIFontDescriptorSystemDesignSerif` */
     serif: 'ui-serif',
-    /** iOS `UIFontDescriptorSystemDesignRounded` */
     rounded: 'ui-rounded',
-    /** iOS `UIFontDescriptorSystemDesignMonospaced` */
     mono: 'ui-monospace',
   },
   default: {
@@ -59,6 +64,14 @@ export const Spacing = {
   four: 24,
   five: 32,
   six: 64,
+} as const;
+
+export const Radius = {
+  sm: 10,
+  md: 16,
+  lg: 24,
+  xl: 32,
+  pill: 999,
 } as const;
 
 export const BottomTabInset = Platform.select({ ios: 50, android: 80 }) ?? 0;

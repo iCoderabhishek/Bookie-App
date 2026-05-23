@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <!-- background: solid peach, no gradient -->
+  <rect width="1024" height="1024" fill="#FFE4D1"/>
+
+  <!-- bookmark shape: coral, deliberately asymmetric (tilted ~6 deg) -->
+  <g transform="rotate(-6 512 512)">
+    <!-- ribbon body with notched bottom -->
+    <path d="
+      M 330 230
+      L 694 230
+      Q 720 230 720 256
+      L 720 760
+      L 512 660
+      L 304 760
+      L 304 256
+      Q 304 230 330 230
+      Z"
+      fill="#FF6B6B"
+      stroke="#1A1118"
+      stroke-width="28"
+      stroke-linejoin="round"/>
+
+    <!-- chunky page-line detail (just one, not a stack) -->
+    <line x1="380" y1="420" x2="644" y2="420"
+      stroke="#1A1118" stroke-width="20" stroke-linecap="round"/>
+
+    <!-- eyes: offset, not perfectly symmetric -->
+    <circle cx="438" cy="338" r="32" fill="#1A1118"/>
+    <circle cx="602" cy="332" r="32" fill="#1A1118"/>
+  </g>
+</svg>

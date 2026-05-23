@@ -1,56 +1,95 @@
-# Welcome to your Expo app 👋
+# Bookie 📚
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Your pookie for links.
 
-## Get started
+## What is it?
 
-1. Install dependencies
+You scroll. You see something cool — a blog post, a YouTube video, a tweet.
+You bookmark it.
 
-   ```bash
-   npm install
-   ```
+Three days later you have 47 bookmarks and no idea what any of them were about.
 
-2. Start the app
+**Bookie reads the link for you and writes a short summary** — title, a few lines explaining what it's about, tags, and a thumbnail. So when you come back later, you actually remember why you saved it.
 
-   ```bash
-   npx expo start
-   ```
+It also lets you write your own little note on each one, like "send this to mom" or "for the weekend project."
 
-In the output, you'll find options to open the app in a
+## What it does
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+- 📥 Paste a link → get a summary in seconds
+- 🤖 Works on articles, YouTube videos, tweets, Reddit posts, and most websites
+- 📝 Add your own notes to anything you save
+- 🔍 Search and filter by topic
+- 📲 Share a link from any app on your phone → Bookie catches it
+- 🌙 Light and dark mode (because eyes)
+- 💾 Everything stays on your phone. No account, no cloud, no tracking
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+## How to use it
 
-## Get a fresh project
+1. Open the app
+2. Tap the big **+** button
+3. Paste a link (or many — up to 10 at once)
+4. Watch the summaries roll in
+5. Tap any card later to read it again, write a note, or open the original
 
-When you're ready, run:
+That's it.
+
+### Sharing from other apps
+
+You're reading something in Chrome / Twitter / Reddit / wherever. Tap the **share** button in that app, pick **Bookie** from the list, and the link will be waiting for you when Bookie opens.
+
+### Deleting
+
+Long-press any bookmark on the home screen → confirm. Or open it and tap "delete bookmark" at the bottom.
+
+## Status
+
+Currently in development. Not on the Play Store yet — getting there soon.
+
+If you got a test build from me directly, thanks for trying it! Let me know what breaks 🙏
+
+---
+
+## For developers
+
+This is the React Native frontend. The backend (which actually does the AI summarising) lives in [`../bookie.ai`](../bookie.ai).
+
+**Stack:** Expo SDK 56 · React Native 0.85 · expo-router · expo-sqlite · expo-share-intent · Sentry
+
+**Run locally:**
 
 ```bash
-npm run reset-project
+npm install --legacy-peer-deps
+npm run android        # or `ios`, `web`
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+The backend must be running on port 8080. Backend URL is configurable in [src/lib/config.ts](src/lib/config.ts) (Android emulator uses `10.0.2.2`, iOS sim uses `localhost`, physical device needs your LAN IP).
 
-### Other setup steps
+**Build for Play Store:**
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+```bash
+npm install -g eas-cli
+eas login
+eas build --profile production --platform android
+eas submit --profile production --platform android
+```
 
-## Learn more
+See [eas.json](eas.json) for the three profiles (development, preview, production).
 
-To learn more about developing your project with Expo, look at the following resources:
+**Custom artwork** lives in [scripts/](scripts/) as SVGs. After editing, run `npm run build:icons` to rasterize.
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+**Crash reporting** is no-op unless `EXPO_PUBLIC_SENTRY_DSN` is set.
 
-## Join the community
+**Project layout:**
 
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+```
+src/
+  app/                  routes (file-based)
+    index.tsx           home — list, search, filter
+    add.tsx             paste links, stream summaries
+    bookmark/[id].tsx   detail + your notes
+  components/           reusable bits
+  lib/
+    api.ts              talks to backend (NDJSON streaming)
+    db.ts               local SQLite store
+    sentry.ts           crash reporting
+```
