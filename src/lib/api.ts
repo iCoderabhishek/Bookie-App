@@ -68,3 +68,61 @@ export function streamProcess(urls: string[], h: StreamHandlers): () => void {
 
   return () => xhr.abort();
 }
+
+/**
+ * Single-URL helper for the note editor's "summarise" action.
+ * Wraps streamProcess and resolves with an HTML bullet list ready to paste.
+ */
+export function summarizeUrl(url: string): Promise<{ html: string; title: string }> {
+  return new Promise((resolve, reject) => {
+    let captured: ProcessResult | null = null;
+    streamProcess([url], {
+      onResult: (r) => {
+        captured = r;
+      },
+      onDone: () => {
+        if (!captured) {
+          reject(new Error('No summary returned'));
+          return;
+        }
+        if (captured.status === 'failed') {
+          reject(new Error(captured.error));
+          return;
+        }
+        if (captured.status === 'unsupported') {
+          reject(new Error(captured.reason));
+          return;
+        }
+        const bullets = parseBulletsFromSummary(captured.summary);
+        const liItems = bullets
+          .map((b) => `<li>${escapeHtml(b)}</li>`)
+          .join('');
+        const html = `<p><strong>${escapeHtml(captured.title)}</strong></p><ul>${liItems}</ul><p><a href="${escapeHtml(url)}">${escapeHtml(url)}</a></p>`;
+        resolve({ html, title: captured.title });
+      },
+      onError: reject,
+    });
+  });
+}
+
+const escapeHtml = (s: string) =>
+  s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+
+const parseBulletsFromSummary = (raw: string): string[] => {
+  if (!raw) return [];
+  const stripped = raw
+    .replace(/<\/li\s*>/gi, '\n')
+    .replace(/<li[^>]*>/gi, '• ')
+    .replace(/<\/?[^>]+>/g, '')
+    .replace(/&nbsp;/gi, ' ');
+  const normalised = stripped.replace(/\s*•\s*/g, '\n• ');
+  return normalised
+    .split('\n')
+    .map((line) => line.replace(/^\s*•\s*/, '').trim())
+    .filter(Boolean);
+};

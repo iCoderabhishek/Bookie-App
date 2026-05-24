@@ -1,12 +1,11 @@
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { ArrowLeft, ArrowSquareOut, PencilSimple, Trash } from 'phosphor-react-native';
 import { useEffect, useRef, useState } from 'react';
 import {
-  Alert,
   KeyboardAvoidingView,
   Linking,
   Platform,
-  Pressable,
   ScrollView,
   StyleSheet,
   TextInput,
@@ -14,11 +13,22 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { ConfirmModal } from '@/components/confirm-modal';
+import { MarkerTag } from '@/components/marker-tag';
+import { Sticker } from '@/components/sticker';
+import { StickerButton } from '@/components/sticker-button';
+import { TapeStrip } from '@/components/tape-strip';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Fonts, Radius, Spacing } from '@/constants/theme';
+import { Borders, Fonts, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { deleteBookmark, getBookmark, updateBookmarkNote } from '@/lib/db';
+import {
+  deleteBookmark,
+  getBookmark,
+  touchBookmark,
+  updateBookmarkNote,
+  updateBookmarkSummary,
+} from '@/lib/db';
 import { parseSummaryBullets } from '@/lib/summary';
 import type { Bookmark } from '@/lib/types';
 
@@ -30,7 +40,11 @@ export default function BookmarkDetail() {
   const [loading, setLoading] = useState(true);
   const [note, setNote] = useState('');
   const [noteSaved, setNoteSaved] = useState(true);
+  const [editingSummary, setEditingSummary] = useState(false);
+  const [summaryDraft, setSummaryDraft] = useState('');
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const summarySaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -44,7 +58,9 @@ export default function BookmarkDetail() {
       if (alive) {
         setBookmark(b);
         setNote(b?.note ?? '');
+        setSummaryDraft(b?.summary ?? '');
         setLoading(false);
+        if (b) touchBookmark(b.id).catch(() => {});
       }
     })();
     return () => {
@@ -55,6 +71,7 @@ export default function BookmarkDetail() {
   useEffect(
     () => () => {
       if (saveTimer.current) clearTimeout(saveTimer.current);
+      if (summarySaveTimer.current) clearTimeout(summarySaveTimer.current);
     },
     [],
   );
@@ -70,19 +87,21 @@ export default function BookmarkDetail() {
     }, 500);
   };
 
-  const handleDelete = () => {
+  const handleSummaryChange = (next: string) => {
+    setSummaryDraft(next);
     if (!bookmark) return;
-    Alert.alert('Delete bookmark?', bookmark.title, [
-      { text: 'cancel', style: 'cancel' },
-      {
-        text: 'delete',
-        style: 'destructive',
-        onPress: async () => {
-          await deleteBookmark(bookmark.id);
-          router.back();
-        },
-      },
-    ]);
+    if (summarySaveTimer.current) clearTimeout(summarySaveTimer.current);
+    summarySaveTimer.current = setTimeout(async () => {
+      await updateBookmarkSummary(bookmark.id, next);
+      setBookmark((prev) => (prev ? { ...prev, summary: next } : prev));
+    }, 500);
+  };
+
+  const handleDelete = async () => {
+    if (!bookmark) return;
+    setConfirmDelete(false);
+    await deleteBookmark(bookmark.id);
+    router.back();
   };
 
   if (loading) {
@@ -94,156 +113,209 @@ export default function BookmarkDetail() {
       <ThemedView style={[styles.flex, styles.center]}>
         <SafeAreaView>
           <ThemedText>Bookmark not found.</ThemedText>
-          <Pressable onPress={() => router.back()}>
-            <ThemedText themeColor="primary">Go back</ThemedText>
-          </Pressable>
+          <StickerButton onPress={() => router.back()}>
+            <ThemedText style={{ padding: Spacing.two }}>Go back</ThemedText>
+          </StickerButton>
         </SafeAreaView>
       </ThemedView>
     );
   }
+
+  const bullets = parseSummaryBullets(summaryDraft || bookmark.summary);
 
   return (
     <ThemedView style={styles.flex}>
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <SafeAreaView style={styles.flex} edges={['top', 'left', 'right']}>
-        <View style={styles.header}>
-          <Pressable onPress={() => router.back()} hitSlop={12}>
-            <ThemedText style={[styles.back, { color: theme.textSecondary }]}>
-              ← back
-            </ThemedText>
-          </Pressable>
-        </View>
-        <ScrollView
-          contentContainerStyle={styles.body}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}>
-          {bookmark.thumbnail ? (
-            <Image
-              source={{ uri: bookmark.thumbnail }}
-              style={styles.hero}
-              contentFit="cover"
-              transition={300}
-            />
-          ) : null}
-
-          {bookmark.category ? (
-            <View
-              style={[
-                styles.categoryPill,
-                { backgroundColor: theme.accent + '33', borderColor: theme.accent },
-              ]}>
-              <ThemedText
-                type="small"
-                style={[styles.categoryText, { color: theme.accent }]}>
-                {bookmark.category}
-              </ThemedText>
-            </View>
-          ) : null}
-
-          <ThemedText
-            style={[styles.title, { fontFamily: Fonts.rounded }]}>
-            {bookmark.title}
-          </ThemedText>
-
-          <ThemedText
-            type="small"
-            themeColor="textSecondary"
-            onPress={() => Linking.openURL(bookmark.url)}
-            style={styles.url}
-            numberOfLines={1}>
-            {bookmark.url}
-          </ThemedText>
-
-          {parseSummaryBullets(bookmark.summary).length > 0 ? (
-            <View style={styles.tldrBlock}>
-              <ThemedText
-                type="small"
-                themeColor="textSecondary"
-                style={[styles.tldrLabel, { fontFamily: Fonts.rounded }]}>
-                TL;DR
-              </ThemedText>
-              {parseSummaryBullets(bookmark.summary).map((bullet, i) => (
-                <View key={i} style={styles.bulletRow}>
-                  <ThemedText style={styles.bulletDot}>•</ThemedText>
-                  <ThemedText style={styles.bulletText}>{bullet}</ThemedText>
-                </View>
-              ))}
-            </View>
-          ) : null}
-
-          {bookmark.tags.length > 0 ? (
-            <View style={styles.tagRow}>
-              {bookmark.tags.map((tag) => (
-                <View
-                  key={tag}
-                  style={[styles.tag, { backgroundColor: theme.backgroundSelected }]}>
-                  <ThemedText type="small" style={styles.tagText}>
-                    #{tag}
-                  </ThemedText>
-                </View>
-              ))}
-            </View>
-          ) : null}
-
-          <View style={styles.noteSection}>
-            <View style={styles.noteHeader}>
-              <ThemedText style={[styles.noteLabel, { fontFamily: Fonts.rounded }]}>
-                your note
-              </ThemedText>
-              <ThemedText
-                type="small"
-                themeColor="textSecondary"
-                style={styles.noteStatus}>
-                {noteSaved ? 'saved' : 'saving…'}
-              </ThemedText>
-            </View>
-            <TextInput
-              value={note}
-              onChangeText={handleNoteChange}
-              placeholder="jot a thought, why you saved this, anything…"
-              placeholderTextColor={theme.textSecondary}
-              multiline
-              style={[
-                styles.noteInput,
-                {
-                  color: theme.text,
-                  backgroundColor: theme.backgroundElement,
-                  borderColor: theme.border,
-                },
-              ]}
-            />
+        <SafeAreaView style={styles.flex} edges={['top', 'left', 'right']}>
+          <View style={styles.header}>
+            <StickerButton onPress={() => router.back()} padding={10} radius={Radius.md}>
+              <ArrowLeft size={22} color={theme.text} weight="bold" />
+            </StickerButton>
           </View>
+          <ScrollView
+            contentContainerStyle={styles.body}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}>
+            {bookmark.thumbnail ? (
+              <Sticker style={styles.heroWrap}>
+                <Image
+                  source={{ uri: bookmark.thumbnail }}
+                  style={styles.hero}
+                  contentFit="cover"
+                  transition={300}
+                />
+                <TapeStrip
+                  color={theme.primary}
+                  style={styles.heroTape}
+                  rotate={-6}
+                />
+              </Sticker>
+            ) : null}
 
-          <Pressable
-            onPress={() => Linking.openURL(bookmark.url)}
-            style={({ pressed }) => [
-              styles.cta,
-              {
-                backgroundColor: theme.primary,
-                transform: [{ scale: pressed ? 0.97 : 1 }],
-              },
-            ]}>
             <ThemedText
-              style={[
-                styles.ctaText,
-                { color: theme.textOnPrimary, fontFamily: Fonts.rounded },
-              ]}>
-              open original ↗
+              style={[styles.title, { color: theme.text, fontFamily: Fonts.display }]}>
+              {bookmark.title}
             </ThemedText>
-          </Pressable>
 
-          <Pressable
-            onPress={handleDelete}
-            style={({ pressed }) => [styles.deleteBtn, { opacity: pressed ? 0.6 : 1 }]}>
-            <ThemedText themeColor="danger" style={styles.deleteText}>
-              delete bookmark
+            <ThemedText
+              onPress={() => Linking.openURL(bookmark.url)}
+              style={[styles.url, { color: theme.textSecondary, fontFamily: Fonts.sans }]}
+              numberOfLines={1}>
+              {bookmark.url}
             </ThemedText>
-          </Pressable>
-        </ScrollView>
-      </SafeAreaView>
+
+            {bullets.length > 0 ? (
+              <Sticker
+                background={theme.backgroundElement}
+                style={styles.tldrCard}>
+                <View style={styles.tldrHeader}>
+                  <View
+                    style={[
+                      styles.tldrStampBox,
+                      { backgroundColor: theme.backgroundSelected, borderColor: theme.border },
+                    ]}>
+                    <ThemedText
+                      style={[
+                        styles.tldrStampText,
+                        { color: theme.text, fontFamily: Fonts.display },
+                      ]}>
+                      TL;DR
+                    </ThemedText>
+                  </View>
+                  <StickerButton
+                    onPress={() => setEditingSummary((v) => !v)}
+                    padding={6}
+                    radius={Radius.sm}
+                    shadowOffset={2}
+                    background={editingSummary ? theme.primary : theme.backgroundElement}>
+                    <PencilSimple
+                      size={16}
+                      color={editingSummary ? theme.textOnPrimary : theme.text}
+                      weight="bold"
+                    />
+                  </StickerButton>
+                </View>
+                {editingSummary ? (
+                  <TextInput
+                    value={summaryDraft}
+                    onChangeText={handleSummaryChange}
+                    multiline
+                    placeholder="one bullet per line, prefix with • or →"
+                    placeholderTextColor={theme.textSecondary}
+                    style={[
+                      styles.summaryInput,
+                      {
+                        color: theme.text,
+                        fontFamily: Fonts.sans,
+                        borderColor: theme.border,
+                      },
+                    ]}
+                  />
+                ) : (
+                  <View style={styles.tldrList}>
+                    {bullets.map((bullet, i) => (
+                      <View key={i} style={styles.bulletRow}>
+                        <ThemedText
+                          style={[
+                            styles.bulletDot,
+                            { fontFamily: Fonts.marker, color: theme.primary },
+                          ]}>
+                          →
+                        </ThemedText>
+                        <ThemedText
+                          style={[
+                            styles.bulletText,
+                            { color: theme.text, fontFamily: Fonts.sans },
+                          ]}>
+                          {bullet}
+                        </ThemedText>
+                      </View>
+                    ))}
+                  </View>
+                )}
+              </Sticker>
+            ) : null}
+
+            {bookmark.tags.length > 0 ? (
+              <View style={styles.tagRow}>
+                {bookmark.tags.map((tag) => (
+                  <MarkerTag key={tag} label={tag} />
+                ))}
+              </View>
+            ) : null}
+
+            <View style={styles.noteSection}>
+              <View style={styles.noteHeader}>
+                <ThemedText style={[styles.noteLabel, { color: theme.text, fontFamily: Fonts.display }]}>
+                  YOUR NOTE
+                </ThemedText>
+                <ThemedText
+                  style={[styles.noteStatus, { color: theme.textSecondary, fontFamily: Fonts.marker }]}>
+                  {noteSaved ? '✓ saved' : 'saving…'}
+                </ThemedText>
+              </View>
+              <Sticker background={theme.backgroundElement} style={styles.noteSticker}>
+                <TextInput
+                  value={note}
+                  onChangeText={handleNoteChange}
+                  placeholder="jot a thought, why you saved this, anything…"
+                  placeholderTextColor={theme.textSecondary}
+                  multiline
+                  style={[
+                    styles.noteInput,
+                    { color: theme.text, fontFamily: Fonts.sans },
+                  ]}
+                />
+              </Sticker>
+            </View>
+
+            <StickerButton
+              onPress={() => Linking.openURL(bookmark.url)}
+              background={theme.primary}
+              radius={Radius.md}
+              padding={Spacing.three}
+              style={styles.cta}>
+              <View style={styles.ctaInner}>
+                <ThemedText
+                  style={[
+                    styles.ctaText,
+                    { color: theme.textOnPrimary, fontFamily: Fonts.display },
+                  ]}>
+                  OPEN ORIGINAL
+                </ThemedText>
+                <ArrowSquareOut size={22} color={theme.textOnPrimary} weight="bold" />
+              </View>
+            </StickerButton>
+
+            <StickerButton
+              onPress={() => setConfirmDelete(true)}
+              background={theme.backgroundElement}
+              radius={Radius.md}
+              padding={Spacing.two}
+              style={styles.deleteBtn}>
+              <View style={styles.deleteInner}>
+                <Trash size={18} color={theme.danger} weight="bold" />
+                <ThemedText
+                  style={[
+                    styles.deleteText,
+                    { color: theme.danger, fontFamily: Fonts.sansBold },
+                  ]}>
+                  delete bookmark
+                </ThemedText>
+              </View>
+            </StickerButton>
+          </ScrollView>
+        </SafeAreaView>
       </KeyboardAvoidingView>
+      <ConfirmModal
+        visible={confirmDelete}
+        title="DELETE BOOKMARK?"
+        message={bookmark.title}
+        onCancel={() => setConfirmDelete(false)}
+        onConfirm={handleDelete}
+      />
     </ThemedView>
   );
 }
@@ -254,126 +326,136 @@ const styles = StyleSheet.create({
   header: {
     paddingHorizontal: Spacing.four,
     paddingTop: Spacing.three,
-  },
-  back: {
-    fontSize: 14,
-    fontWeight: '600',
+    flexDirection: 'row',
   },
   body: {
     paddingHorizontal: Spacing.four,
     paddingTop: Spacing.three,
     paddingBottom: Spacing.six,
-    gap: Spacing.three,
+    gap: Spacing.four,
+  },
+  heroWrap: {
+    overflow: 'hidden',
+    padding: 0,
   },
   hero: {
     width: '100%',
     aspectRatio: 16 / 9,
-    borderRadius: Radius.lg,
     backgroundColor: '#00000010',
   },
-  categoryPill: {
-    alignSelf: 'flex-start',
-    paddingHorizontal: Spacing.two,
-    paddingVertical: 4,
-    borderRadius: Radius.pill,
-    borderWidth: 1,
-  },
-  categoryText: {
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    fontSize: 11,
-    letterSpacing: 0.5,
+  heroTape: {
+    position: 'absolute',
+    top: -8,
+    left: 20,
   },
   title: {
-    fontSize: 32,
-    lineHeight: 38,
-    fontWeight: '800',
-    letterSpacing: -0.5,
+    fontSize: 36,
+    lineHeight: 40,
   },
   url: {
     textDecorationLine: 'underline',
+    fontSize: 15,
   },
-  summary: {
+  tldrCard: {
+    padding: Spacing.three,
+    gap: Spacing.three,
+    marginTop: Spacing.two,
+  },
+  tldrStamp: {
+    flexDirection: 'row',
+  },
+  tldrHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  summaryInput: {
+    minHeight: 120,
+    padding: Spacing.three,
     fontSize: 16,
     lineHeight: 24,
+    textAlignVertical: 'top',
+    borderWidth: Borders.thin,
   },
-  tldrBlock: {
-    gap: Spacing.one,
+  tldrStampBox: {
+    borderWidth: Borders.thick,
+    paddingHorizontal: Spacing.two,
+    paddingVertical: 4,
+    transform: [{ rotate: '-2deg' }],
   },
-  tldrLabel: {
-    fontSize: 12,
-    fontWeight: '800',
-    letterSpacing: 1.2,
-    textTransform: 'uppercase',
-    marginBottom: 4,
+  tldrStampText: {
+    fontSize: 18,
+    letterSpacing: 1,
+  },
+  tldrList: {
+    gap: Spacing.two,
   },
   bulletRow: {
     flexDirection: 'row',
-    gap: Spacing.one,
+    gap: Spacing.two,
   },
   bulletDot: {
-    fontSize: 16,
-    lineHeight: 24,
+    fontSize: 20,
+    lineHeight: 26,
   },
   bulletText: {
     flex: 1,
-    fontSize: 16,
-    lineHeight: 24,
+    fontSize: 17,
+    lineHeight: 26,
   },
   tagRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: Spacing.one,
-  },
-  tag: {
-    paddingHorizontal: Spacing.two,
-    paddingVertical: 4,
-    borderRadius: Radius.pill,
-  },
-  tagText: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  cta: {
-    marginTop: Spacing.three,
-    borderRadius: Radius.pill,
-    paddingVertical: Spacing.three,
-    alignItems: 'center',
-  },
-  ctaText: {
-    fontSize: 18,
-    fontWeight: '800',
-  },
-  deleteBtn: {
-    alignSelf: 'center',
-    padding: Spacing.three,
-  },
-  deleteText: {
-    fontWeight: '600',
+    gap: Spacing.three,
+    rowGap: Spacing.two,
   },
   noteSection: {
-    marginTop: Spacing.three,
     gap: Spacing.two,
   },
   noteHeader: {
     flexDirection: 'row',
-    alignItems: 'baseline',
+    alignItems: 'center',
     justifyContent: 'space-between',
   },
   noteLabel: {
-    fontSize: 18,
-    fontWeight: '700',
+    fontSize: 22,
+    letterSpacing: -0.5,
   },
   noteStatus: {
-    fontWeight: '500',
+    fontSize: 14,
+  },
+  noteSticker: {
+    padding: 0,
   },
   noteInput: {
-    minHeight: 120,
-    borderRadius: Radius.lg,
-    borderWidth: 1,
+    minHeight: 140,
     padding: Spacing.three,
-    fontSize: 16,
-    lineHeight: 22,
+    fontSize: 17,
+    lineHeight: 24,
     textAlignVertical: 'top',
+  },
+  cta: {
+    marginTop: Spacing.two,
+  },
+  ctaInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+  },
+  ctaText: {
+    fontSize: 20,
+    letterSpacing: 0.5,
+  },
+  deleteBtn: {
+    alignSelf: 'center',
+    paddingHorizontal: Spacing.three,
+  },
+  deleteInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.one,
+  },
+  deleteText: {
+    fontSize: 15,
   },
 });

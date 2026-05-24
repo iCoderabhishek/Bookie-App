@@ -1,3 +1,5 @@
+import type { FolderColor } from '@/constants/theme';
+
 export type ProcessOk = {
   url: string;
   status: 'ok';
@@ -40,5 +42,38 @@ export type Bookmark = {
   category: string | null;
   thumbnail: string | null;
   note: string;
+  folderId: number | null;
   createdAt: number;
+  lastViewedAt: number | null;
+};
+
+export type Folder = {
+  id: number;
+  name: string;
+  color: FolderColor;
+  createdAt: number;
+};
+
+export type Note = {
+  id: number;
+  title: string;
+  bodyHtml: string;
+  folderId: number | null;
+  createdAt: number;
+  updatedAt: number;
+  lastViewedAt: number | null;
+};
+
+export type FeedItem =
+  | { kind: 'bookmark'; recency: number; bookmark: Bookmark }
+  | { kind: 'note'; recency: number; note: Note }
+  | { kind: 'todo'; recency: number; todo: Todo };
+
+export type Todo = {
+  id: number;
+  text: string;
+  done: boolean;
+  folderId: number | null;
+  createdAt: number;
+  completedAt: number | null;
 };
