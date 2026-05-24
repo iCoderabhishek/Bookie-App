@@ -5,6 +5,7 @@ import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated'
 import { ThemedText } from '@/components/themed-text';
 import { Fonts, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { parseSummaryBullets } from '@/lib/summary';
 import type { Bookmark } from '@/lib/types';
 
 type Props = {
@@ -52,7 +53,7 @@ export function BookmarkCard({ bookmark, onPress, onLongPress }: Props) {
           themeColor="textSecondary"
           numberOfLines={2}
           style={styles.summary}>
-          {bookmark.summary}
+          {parseSummaryBullets(bookmark.summary).map((b) => `• ${b}`).join('\n')}
         </ThemedText>
 
         {bookmark.tags.length > 0 ? (

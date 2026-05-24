@@ -19,6 +19,7 @@ import { ThemedView } from '@/components/themed-view';
 import { Fonts, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { deleteBookmark, getBookmark, updateBookmarkNote } from '@/lib/db';
+import { parseSummaryBullets } from '@/lib/summary';
 import type { Bookmark } from '@/lib/types';
 
 export default function BookmarkDetail() {
@@ -155,7 +156,22 @@ export default function BookmarkDetail() {
             {bookmark.url}
           </ThemedText>
 
-          <ThemedText style={styles.summary}>{bookmark.summary}</ThemedText>
+          {parseSummaryBullets(bookmark.summary).length > 0 ? (
+            <View style={styles.tldrBlock}>
+              <ThemedText
+                type="small"
+                themeColor="textSecondary"
+                style={[styles.tldrLabel, { fontFamily: Fonts.rounded }]}>
+                TL;DR
+              </ThemedText>
+              {parseSummaryBullets(bookmark.summary).map((bullet, i) => (
+                <View key={i} style={styles.bulletRow}>
+                  <ThemedText style={styles.bulletDot}>•</ThemedText>
+                  <ThemedText style={styles.bulletText}>{bullet}</ThemedText>
+                </View>
+              ))}
+            </View>
+          ) : null}
 
           {bookmark.tags.length > 0 ? (
             <View style={styles.tagRow}>
@@ -278,6 +294,29 @@ const styles = StyleSheet.create({
     textDecorationLine: 'underline',
   },
   summary: {
+    fontSize: 16,
+    lineHeight: 24,
+  },
+  tldrBlock: {
+    gap: Spacing.one,
+  },
+  tldrLabel: {
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 1.2,
+    textTransform: 'uppercase',
+    marginBottom: 4,
+  },
+  bulletRow: {
+    flexDirection: 'row',
+    gap: Spacing.one,
+  },
+  bulletDot: {
+    fontSize: 16,
+    lineHeight: 24,
+  },
+  bulletText: {
+    flex: 1,
     fontSize: 16,
     lineHeight: 24,
   },
