@@ -1,6 +1,7 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import {
   ArrowLeft,
+  ArrowRight,
   FolderSimple,
   Plus,
   Trash,
@@ -43,6 +44,7 @@ import {
   listFolders,
   listNotes,
   renameFolder,
+  updateNote,
 } from '@/lib/db';
 import type { Folder, Note } from '@/lib/types';
 
@@ -58,6 +60,10 @@ export default function NotesScreen() {
   const [createOpen, setCreateOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<{ id: number; label: string } | null>(null);
   const [folderDeleteTarget, setFolderDeleteTarget] = useState<Folder | null>(null);
+  // Long-press a note → open an actions sheet (Move / Delete) instead of
+  // jumping straight to delete.
+  const [actionsTarget, setActionsTarget] = useState<Note | null>(null);
+  const [moveTarget, setMoveTarget] = useState<Note | null>(null);
 
   const refresh = useCallback(async () => {
     const [ns, fs] = await Promise.all([listNotes(), listFolders()]);
@@ -244,12 +250,7 @@ export default function NotesScreen() {
                 folder={item.folderId != null ? folderById.get(item.folderId) ?? null : null}
                 rotation={(index % 2 === 0 ? -1 : 1) * 0.5}
                 onPress={() => router.push(`/note/${item.id}` as never)}
-                onLongPress={() =>
-                  setDeleteTarget({
-                    id: item.id,
-                    label: item.title || 'this note',
-                  })
-                }
+                onLongPress={() => setActionsTarget(item)}
               />
             )}
           />
@@ -293,6 +294,34 @@ export default function NotesScreen() {
           }
           onCancel={() => setFolderDeleteTarget(null)}
           onConfirm={onConfirmFolderDelete}
+        />
+
+        <NoteActionsSheet
+          target={actionsTarget}
+          onClose={() => setActionsTarget(null)}
+          onMove={() => {
+            const t = actionsTarget;
+            setActionsTarget(null);
+            if (t) setMoveTarget(t);
+          }}
+          onDelete={() => {
+            const t = actionsTarget;
+            setActionsTarget(null);
+            if (t) setDeleteTarget({ id: t.id, label: t.title || 'this note' });
+          }}
+        />
+
+        <FolderPickerModal
+          target={moveTarget}
+          folders={folders}
+          onClose={() => setMoveTarget(null)}
+          onPick={async (folderId) => {
+            const t = moveTarget;
+            setMoveTarget(null);
+            if (!t) return;
+            await updateNote(t.id, { folderId });
+            await refresh();
+          }}
         />
       </SafeAreaView>
     </ThemedView>
@@ -464,6 +493,139 @@ function NewFolderModal({
                 CREATE
               </ThemedText>
             </StickerButton>
+          </Sticker>
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+}
+
+function NoteActionsSheet({
+  target,
+  onClose,
+  onMove,
+  onDelete,
+}: {
+  target: Note | null;
+  onClose: () => void;
+  onMove: () => void;
+  onDelete: () => void;
+}) {
+  const theme = useTheme();
+  const visible = target !== null;
+  return (
+    <Modal transparent animationType="fade" visible={visible} onRequestClose={onClose}>
+      <Pressable style={modalStyles.backdrop} onPress={onClose}>
+        <Pressable onPress={(e) => e.stopPropagation()}>
+          <Sticker background={theme.background} style={modalStyles.box}>
+            <ThemedText
+              style={[modalStyles.heading, { color: theme.text, fontFamily: Fonts.display }]}
+              numberOfLines={1}>
+              {target?.title?.trim() || 'NOTE'}
+            </ThemedText>
+            <StickerButton
+              onPress={onMove}
+              background={theme.backgroundElement}
+              radius={Radius.md}
+              padding={Spacing.three}>
+              <View style={actionStyles.actionRow}>
+                <ArrowRight size={18} color={theme.text} weight="bold" />
+                <ThemedText
+                  style={[actionStyles.actionLabel, { color: theme.text, fontFamily: Fonts.display }]}>
+                  MOVE TO FOLDER
+                </ThemedText>
+              </View>
+            </StickerButton>
+            <StickerButton
+              onPress={onDelete}
+              background={theme.danger}
+              radius={Radius.md}
+              padding={Spacing.three}>
+              <View style={actionStyles.actionRow}>
+                <Trash size={18} color={theme.textOnPrimary} weight="bold" />
+                <ThemedText
+                  style={[
+                    actionStyles.actionLabel,
+                    { color: theme.textOnPrimary, fontFamily: Fonts.display },
+                  ]}>
+                  DELETE
+                </ThemedText>
+              </View>
+            </StickerButton>
+          </Sticker>
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+}
+
+function FolderPickerModal({
+  target,
+  folders,
+  onClose,
+  onPick,
+}: {
+  target: Note | null;
+  folders: Folder[];
+  onClose: () => void;
+  onPick: (folderId: number | null) => void;
+}) {
+  const theme = useTheme();
+  const visible = target !== null;
+  const currentId = target?.folderId ?? null;
+  return (
+    <Modal transparent animationType="fade" visible={visible} onRequestClose={onClose}>
+      <Pressable style={modalStyles.backdrop} onPress={onClose}>
+        <Pressable onPress={(e) => e.stopPropagation()}>
+          <Sticker background={theme.background} style={modalStyles.box}>
+            <ThemedText
+              style={[modalStyles.heading, { color: theme.text, fontFamily: Fonts.display }]}>
+              MOVE TO
+            </ThemedText>
+            <Pressable onPress={() => onPick(null)}>
+              <Sticker
+                background={
+                  currentId == null ? theme.backgroundSelected : theme.backgroundElement
+                }
+                radius={Radius.sm}
+                shadowOffset={2}
+                style={actionStyles.pickerRow}>
+                <ThemedText
+                  style={[
+                    actionStyles.pickerText,
+                    { color: theme.text, fontFamily: Fonts.sansBold },
+                  ]}>
+                  UNFILED
+                </ThemedText>
+              </Sticker>
+            </Pressable>
+            {folders.map((f) => (
+              <Pressable key={f.id} onPress={() => onPick(f.id)}>
+                <Sticker
+                  background={
+                    currentId === f.id ? theme.backgroundSelected : theme.backgroundElement
+                  }
+                  radius={Radius.sm}
+                  shadowOffset={2}
+                  style={actionStyles.pickerRow}>
+                  <View style={actionStyles.pickerInner}>
+                    <View
+                      style={[
+                        actionStyles.swatch,
+                        { backgroundColor: FolderColors[f.color], borderColor: theme.border },
+                      ]}
+                    />
+                    <ThemedText
+                      style={[
+                        actionStyles.pickerText,
+                        { color: theme.text, fontFamily: Fonts.sansBold },
+                      ]}>
+                      {f.name.toUpperCase()}
+                    </ThemedText>
+                  </View>
+                </Sticker>
+              </Pressable>
+            ))}
           </Sticker>
         </Pressable>
       </Pressable>
@@ -673,5 +835,35 @@ const modalStyles = StyleSheet.create({
   cta: {
     fontSize: 22,
     letterSpacing: 1,
+  },
+});
+
+const actionStyles = StyleSheet.create({
+  actionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+  },
+  actionLabel: {
+    fontSize: 18,
+    letterSpacing: 1,
+  },
+  pickerRow: {
+    padding: Spacing.two,
+  },
+  pickerInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+  },
+  pickerText: {
+    fontSize: 16,
+    letterSpacing: 0.5,
+  },
+  swatch: {
+    width: 18,
+    height: 18,
+    borderRadius: Radius.sm,
+    borderWidth: Borders.thin,
   },
 });

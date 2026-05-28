@@ -6,8 +6,9 @@ import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated'
 import { Sticker } from '@/components/sticker';
 import { TapeStrip } from '@/components/tape-strip';
 import { ThemedText } from '@/components/themed-text';
-import { Borders, Fonts, FolderColors, Spacing } from '@/constants/theme';
+import { Fonts, FolderColors, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { useVibe } from '@/hooks/use-vibe';
 import type { Folder, Note } from '@/lib/types';
 
 type Props = {
@@ -20,11 +21,13 @@ type Props = {
 
 export function NoteCard({ note, folder, compact, onPress, onLongPress }: Props) {
   const theme = useTheme();
+  const vibe = useVibe();
   const rotation = useMemo(() => {
+    if (!vibe.showDecorations) return 0;
     const seed = note.id;
     const t = ((seed * 9301 + 49297) % 233280) / 233280;
     return (t - 0.5) * 1.6;
-  }, [note.id]);
+  }, [note.id, vibe.showDecorations]);
 
   const tapeColor = useMemo(() => {
     const colors = ['#FFE45C', '#FF9DC5', '#7BB7FF', '#7FE0B8'];
@@ -45,9 +48,9 @@ export function NoteCard({ note, folder, compact, onPress, onLongPress }: Props)
 
   return (
     <Animated.View
-      entering={FadeInDown.duration(280).springify().damping(18)}
       layout={LinearTransition.duration(220)}
       style={[styles.outer, compact && styles.outerCompact]}>
+      <Animated.View entering={FadeInDown.duration(280).springify().damping(18)}>
       <Pressable
         onPress={onPress}
         onLongPress={onLongPress}
@@ -57,13 +60,22 @@ export function NoteCard({ note, folder, compact, onPress, onLongPress }: Props)
         ]}>
         <Sticker
           background={folder ? FolderColors[folder.color] : theme.backgroundElement}
-          style={[styles.card, compact && styles.cardCompact]}
+          style={[
+            styles.card,
+            compact && styles.cardCompact,
+            !vibe.showDecorations && (compact ? styles.cardCompactTight : styles.cardTight),
+          ]}
           shadowOffset={compact ? 3 : 4}>
           <View style={styles.kindRow}>
             <View
               style={[
                 styles.kindBadge,
-                { backgroundColor: theme.background, borderColor: theme.border },
+                {
+                  backgroundColor: theme.background,
+                  borderColor: theme.border,
+                  borderWidth: vibe.borderWidth > 0 ? 1 : 0,
+                  borderRadius: vibe.radiusSmall,
+                },
               ]}>
               <NotePencil size={14} color={theme.text} weight="duotone" />
               <ThemedText
@@ -108,6 +120,7 @@ export function NoteCard({ note, folder, compact, onPress, onLongPress }: Props)
           rotate={rotation > 0 ? -10 : 10}
         />
       </Pressable>
+      </Animated.View>
     </Animated.View>
   );
 }
@@ -124,20 +137,32 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.one,
   },
   card: {
-    padding: Spacing.three,
+    padding: Spacing.four,
     gap: Spacing.two,
+    overflow: 'hidden',
   },
   cardCompact: {
-    padding: Spacing.two,
+    padding: Spacing.three,
     gap: Spacing.one,
+    overflow: 'hidden',
+    // Cap card height in grid mode so a long note doesn't make this card
+    // dwarf the one next to it in its column.
+    maxHeight: 170,
+  },
+  // Non-retro vibe overrides — tighter padding outside the sticker look.
+  cardTight: {
+    padding: Spacing.three,
+  },
+  cardCompactTight: {
+    padding: Spacing.two,
   },
   titleCompact: {
-    fontSize: 17,
-    lineHeight: 21,
+    fontSize: 14,
+    lineHeight: 17,
   },
   bodyCompact: {
-    fontSize: 13,
-    lineHeight: 18,
+    fontSize: 12,
+    lineHeight: 16,
   },
   kindRow: {
     flexDirection: 'row',
@@ -148,7 +173,6 @@ const styles = StyleSheet.create({
     gap: 4,
     paddingHorizontal: Spacing.two,
     paddingVertical: 4,
-    borderWidth: Borders.thin,
   },
   kindLabel: {
     fontSize: 12,

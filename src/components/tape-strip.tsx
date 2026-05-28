@@ -1,5 +1,7 @@
 import { StyleSheet, View, type ViewStyle } from 'react-native';
 
+import { useVibe } from '@/hooks/use-vibe';
+
 type Props = {
   color?: string;
   width?: number;
@@ -15,6 +17,8 @@ export function TapeStrip({
   rotate = -8,
   style,
 }: Props) {
+  const vibe = useVibe();
+  if (!vibe.showDecorations) return null;
   return (
     <View
       pointerEvents="none"

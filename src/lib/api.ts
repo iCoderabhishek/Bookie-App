@@ -86,7 +86,7 @@ export function summarizeUrl(url: string): Promise<{ html: string; title: string
           return;
         }
         if (captured.status === 'failed') {
-          reject(new Error(captured.error));
+          reject(new Error(prettifyError(captured.error)));
           return;
         }
         if (captured.status === 'unsupported') {
@@ -104,6 +104,42 @@ export function summarizeUrl(url: string): Promise<{ html: string; title: string
     });
   });
 }
+
+export const prettifyError = (raw: string | undefined | null): string => {
+  if (!raw) return 'Something went wrong';
+  const trimmed = raw.trim();
+  if (!trimmed.startsWith('{')) return trimmed;
+  try {
+    const parsed: unknown = JSON.parse(trimmed);
+    const msg = pickMessage(parsed);
+    const code = pickCode(parsed);
+    if (!msg) return trimmed;
+    if (code === 503 || code === 429) return 'AI model is busy — try again in a moment';
+    if (code === 404) return 'Page not found';
+    if (code === 403) return 'Site blocked the request';
+    if (code && code >= 500) return 'Site or AI service is down — try again later';
+    return msg;
+  } catch {
+    return trimmed;
+  }
+};
+
+const pickMessage = (e: unknown): string | null => {
+  if (typeof e !== 'object' || e === null) return null;
+  const obj = e as Record<string, unknown>;
+  if (typeof obj.message === 'string') return obj.message;
+  if (typeof obj.error === 'object' && obj.error !== null) return pickMessage(obj.error);
+  if (typeof obj.error === 'string') return obj.error;
+  return null;
+};
+
+const pickCode = (e: unknown): number | null => {
+  if (typeof e !== 'object' || e === null) return null;
+  const obj = e as Record<string, unknown>;
+  if (typeof obj.code === 'number') return obj.code;
+  if (typeof obj.error === 'object' && obj.error !== null) return pickCode(obj.error);
+  return null;
+};
 
 const escapeHtml = (s: string) =>
   s

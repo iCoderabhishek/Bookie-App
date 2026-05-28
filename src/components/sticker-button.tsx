@@ -1,8 +1,9 @@
 import { type ReactNode } from 'react';
 import { Platform, Pressable, StyleSheet, View, type ViewStyle } from 'react-native';
 
-import { Borders, Radius, Shadows } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { useVibe } from '@/hooks/use-vibe';
+import { withAlpha } from '@/lib/color';
 
 type Props = {
   onPress?: () => void;
@@ -28,9 +29,9 @@ export function StickerButton({
   background,
   borderColor,
   shadowColor,
-  shadowOffset = Shadows.hard.offset,
-  borderWidth = Borders.thick,
-  radius = Radius.md,
+  shadowOffset,
+  borderWidth,
+  radius,
   padding,
   rotate,
   disabled,
@@ -38,9 +39,16 @@ export function StickerButton({
   hitSlop = 6,
 }: Props) {
   const theme = useTheme();
-  const bg = background ?? theme.backgroundElement;
-  const bc = borderColor ?? theme.border;
+  const vibe = useVibe();
+
+  const rawBg = background ?? theme.backgroundElement;
+  const bg = vibe.surfaceOpacity < 1 ? withAlpha(rawBg, vibe.surfaceOpacity) : rawBg;
+  const bw = borderWidth ?? vibe.borderWidth;
+  const bc = bw > 0 ? (borderColor ?? theme.border) : 'transparent';
   const sc = shadowColor ?? theme.shadow;
+  const r = radius ?? vibe.radius;
+  const off = shadowOffset ?? vibe.shadowOffset;
+  const press = vibe.pressTranslate;
 
   return (
     <Pressable
@@ -49,31 +57,23 @@ export function StickerButton({
       disabled={disabled}
       hitSlop={hitSlop}
       style={({ pressed }) => {
-        const shadowStyle: ViewStyle = pressed
-          ? {}
-          : Platform.select<ViewStyle>({
-              web: { boxShadow: `${shadowOffset}px ${shadowOffset}px 0 0 ${sc}` },
-              default: {
-                shadowColor: sc,
-                shadowOffset: { width: shadowOffset, height: shadowOffset },
-                shadowOpacity: 1,
-                shadowRadius: 0,
-                elevation: 0,
-              },
-            }) ?? {};
+        const shadowStyle: ViewStyle =
+          pressed && vibe.shadowStyle === 'hard'
+            ? {}
+            : buildShadow(vibe.shadowStyle, off, sc, vibe);
 
         return [
           styles.base,
           {
             backgroundColor: bg,
             borderColor: bc,
-            borderWidth,
-            borderRadius: radius,
+            borderWidth: bw,
+            borderRadius: r,
             padding,
-            opacity: disabled ? 0.5 : 1,
+            opacity: disabled ? 0.5 : pressed && vibe.shadowStyle !== 'hard' ? 0.7 : 1,
             transform: [
-              { translateX: pressed ? shadowOffset : 0 },
-              { translateY: pressed ? shadowOffset : 0 },
+              { translateX: pressed ? press : 0 },
+              { translateY: pressed ? press : 0 },
               ...(rotate ? [{ rotate: `${rotate}deg` }] : []),
             ],
           },
@@ -84,6 +84,39 @@ export function StickerButton({
       <View style={styles.inner}>{children}</View>
     </Pressable>
   );
+}
+
+function buildShadow(
+  kind: 'hard' | 'soft' | 'none',
+  offset: number,
+  color: string,
+  vibe: { shadowOpacity: number; shadowBlur: number },
+): ViewStyle {
+  if (kind === 'none') return {};
+  if (kind === 'hard') {
+    return Platform.select<ViewStyle>({
+      web: { boxShadow: `${offset}px ${offset}px 0 0 ${color}` },
+      default: {
+        shadowColor: color,
+        shadowOffset: { width: offset, height: offset },
+        shadowOpacity: 1,
+        shadowRadius: 0,
+        elevation: 0,
+      },
+    }) ?? {};
+  }
+  return Platform.select<ViewStyle>({
+    web: {
+      boxShadow: `0 ${offset}px ${vibe.shadowBlur}px rgba(0,0,0,${vibe.shadowOpacity})`,
+    },
+    default: {
+      shadowColor: '#000000',
+      shadowOffset: { width: 0, height: offset },
+      shadowOpacity: vibe.shadowOpacity,
+      shadowRadius: vibe.shadowBlur,
+      elevation: Math.round(offset),
+    },
+  }) ?? {};
 }
 
 const styles = StyleSheet.create({

@@ -4,8 +4,9 @@ import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated'
 
 import { Sticker } from '@/components/sticker';
 import { ThemedText } from '@/components/themed-text';
-import { Borders, Fonts, FolderColors, Spacing } from '@/constants/theme';
+import { Fonts, FolderColors, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { useVibe } from '@/hooks/use-vibe';
 import type { Folder, Todo } from '@/lib/types';
 
 type Props = {
@@ -18,24 +19,34 @@ type Props = {
 
 export function TodoPin({ todo, folder, compact, onToggle, onLongPress }: Props) {
   const theme = useTheme();
+  const vibe = useVibe();
   const accent = folder ? FolderColors[folder.color] : theme.warning;
   return (
     <Animated.View
-      entering={FadeInDown.duration(280).springify().damping(18)}
       layout={LinearTransition.duration(220)}
       style={[styles.outer, compact && styles.outerCompact]}>
+      <Animated.View entering={FadeInDown.duration(280).springify().damping(18)}>
       <Pressable onPress={onToggle} onLongPress={onLongPress} delayLongPress={400}>
         <Sticker
           background={theme.backgroundElement}
           style={[styles.card, { borderLeftWidth: 8, borderLeftColor: accent }]}
           shadowOffset={compact ? 3 : 4}>
-          <View style={[styles.inner, compact && styles.innerCompact]}>
+          <View
+            style={[
+              styles.inner,
+              compact && styles.innerCompact,
+              !vibe.showDecorations && (compact ? styles.innerCompactTight : styles.innerTight),
+            ]}>
             <View
               style={[
                 styles.checkbox,
                 {
                   borderColor: theme.border,
                   backgroundColor: todo.done ? theme.primary : theme.background,
+                  // Checkbox border honors the vibe — thick for retro/brutalist,
+                  // hairline for minimal/glass, none for clay.
+                  borderWidth: vibe.borderWidth > 0 ? Math.max(vibe.borderWidth, 1.5) : 1,
+                  borderRadius: vibe.radiusSmall,
                 },
               ]}>
               {todo.done ? <Check size={18} color={theme.textOnPrimary} weight="bold" /> : null}
@@ -45,7 +56,12 @@ export function TodoPin({ todo, folder, compact, onToggle, onLongPress }: Props)
                 <View
                   style={[
                     styles.kindBadge,
-                    { backgroundColor: theme.background, borderColor: theme.border },
+                    {
+                      backgroundColor: theme.background,
+                      borderColor: theme.border,
+                      borderWidth: vibe.borderWidth > 0 ? 1 : 0,
+                      borderRadius: vibe.radiusSmall,
+                    },
                   ]}>
                   <ThemedText
                     style={[styles.kindLabel, { color: theme.text, fontFamily: Fonts.sansBold }]}>
@@ -76,6 +92,7 @@ export function TodoPin({ todo, folder, compact, onToggle, onLongPress }: Props)
           </View>
         </Sticker>
       </Pressable>
+      </Animated.View>
     </Animated.View>
   );
 }
@@ -97,22 +114,28 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.three,
-    padding: Spacing.three,
+    padding: Spacing.four,
   },
   innerCompact: {
     flexDirection: 'column',
     alignItems: 'flex-start',
     gap: Spacing.two,
+    padding: Spacing.three,
+  },
+  // Non-retro vibe overrides — tighter padding outside the sticker look.
+  innerTight: {
+    padding: Spacing.three,
+  },
+  innerCompactTight: {
     padding: Spacing.two,
   },
   textCompact: {
-    fontSize: 14,
-    lineHeight: 19,
+    fontSize: 12,
+    lineHeight: 16,
   },
   checkbox: {
     width: 28,
     height: 28,
-    borderWidth: Borders.thick,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -126,7 +149,6 @@ const styles = StyleSheet.create({
   kindBadge: {
     paddingHorizontal: Spacing.one,
     paddingVertical: 2,
-    borderWidth: Borders.thin,
   },
   kindLabel: {
     fontSize: 11,

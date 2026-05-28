@@ -1,7 +1,14 @@
+import * as Clipboard from 'expo-clipboard';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ArrowLeft, ArrowsClockwise, Sparkle, X } from 'phosphor-react-native';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  ArrowLeft,
+  ArrowsClockwise,
+  ClipboardText,
+  Sparkle,
+  X,
+} from 'phosphor-react-native';
+import { useCallback, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -20,10 +27,11 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Borders, Fonts, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { streamProcess } from '@/lib/api';
+import { prettifyError, streamProcess } from '@/lib/api';
 import { saveBookmark } from '@/lib/db';
 import { Sentry } from '@/lib/sentry';
 import type { ProcessResult } from '@/lib/types';
+import { normalizeUrl, stripScheme } from '@/lib/url';
 
 type Item = ProcessResult & { saved?: boolean; saveError?: boolean };
 
@@ -31,7 +39,7 @@ export default function AddScreen() {
   const router = useRouter();
   const theme = useTheme();
   const params = useLocalSearchParams<{ url?: string }>();
-  const [input, setInput] = useState(params.url ?? '');
+  const [input, setInput] = useState(params.url ? stripScheme(params.url) : '');
   const [items, setItems] = useState<Item[]>([]);
   const [streaming, setStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -50,7 +58,20 @@ export default function AddScreen() {
       .split(/[\s,]+/)
       .map((s) => s.trim())
       .filter(Boolean)
+      .map(normalizeUrl)
       .slice(0, 10);
+  };
+
+  const onPaste = async () => {
+    const text = await Clipboard.getStringAsync();
+    if (!text) return;
+    // Strip schemes from each URL in the pasted blob so the input stays clean.
+    const cleaned = text
+      .split(/[\s,]+/)
+      .map((s) => stripScheme(s.trim()))
+      .filter(Boolean)
+      .join('\n');
+    setInput((prev) => (prev.trim() ? `${prev.trim()}\n${cleaned}` : cleaned));
   };
 
   const runUrls = useCallback((urls: string[]) => {
@@ -130,8 +151,8 @@ export default function AddScreen() {
             <Sticker background={theme.backgroundElement} style={styles.inputSticker}>
               <TextInput
                 value={input}
-                onChangeText={setInput}
-                placeholder="https://..."
+                onChangeText={(s) => setInput(stripScheme(s))}
+                placeholder="0bhishek.tech"
                 placeholderTextColor={theme.textSecondary}
                 multiline
                 editable={!streaming}
@@ -143,6 +164,31 @@ export default function AddScreen() {
                   { color: theme.text, fontFamily: Fonts.sans },
                 ]}
               />
+              <View style={styles.inputFooter}>
+                <ThemedText
+                  style={[
+                    styles.schemeHint,
+                    { color: theme.textSecondary, fontFamily: Fonts.marker },
+                  ]}>
+                  https:// added for you
+                </ThemedText>
+                <StickerButton
+                  onPress={onPaste}
+                  disabled={streaming}
+                  background={theme.backgroundSelected}
+                  padding={Spacing.two}>
+                  <View style={styles.pasteInner}>
+                    <ClipboardText size={16} color={theme.text} weight="bold" />
+                    <ThemedText
+                      style={[
+                        styles.pasteLabel,
+                        { color: theme.text, fontFamily: Fonts.sansBold },
+                      ]}>
+                      PASTE
+                    </ThemedText>
+                  </View>
+                </StickerButton>
+              </View>
             </Sticker>
 
             {error ? (
@@ -268,7 +314,7 @@ function ResultRowInner({ item, theme }: { item: Item; theme: Theme }) {
       ? item.summary
       : item.status === 'unsupported'
         ? item.reason
-        : item.error;
+        : prettifyError(item.error);
 
   const thumb =
     item.status === 'ok' || item.status === 'preview' ? item.thumbnail : null;
@@ -359,6 +405,28 @@ const styles = StyleSheet.create({
     fontSize: 18,
     lineHeight: 26,
     textAlignVertical: 'top',
+  },
+  inputFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: Spacing.three,
+    paddingBottom: Spacing.two,
+    gap: Spacing.two,
+  },
+  schemeHint: {
+    fontSize: 13,
+    flex: 1,
+  },
+  pasteInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: Spacing.two,
+  },
+  pasteLabel: {
+    fontSize: 12,
+    letterSpacing: 1,
   },
   error: {
     fontSize: 16,

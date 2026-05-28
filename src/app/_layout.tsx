@@ -26,6 +26,20 @@ import { Sentry, initSentry } from '@/lib/sentry';
 initSentry();
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
+// tentap-editor's bridge warns "Editor isn't ready yet" every time it tries
+// to send a message before the WebView ref attaches (~10 warns per editor
+// mount during the brief init window). Silence just that one — it's benign
+// and the editor recovers on its own once the WebView is up.
+{
+  const origWarn = console.warn;
+  console.warn = (...args: unknown[]) => {
+    if (typeof args[0] === 'string' && args[0].includes("Editor isn't ready yet")) {
+      return;
+    }
+    origWarn(...args);
+  };
+}
+
 function RootLayout() {
   const [fontsLoaded] = useFonts({
     ArchivoBlack_400Regular,

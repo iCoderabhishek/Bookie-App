@@ -7,8 +7,9 @@ import { MarkerTag } from '@/components/marker-tag';
 import { Sticker } from '@/components/sticker';
 import { TapeStrip } from '@/components/tape-strip';
 import { ThemedText } from '@/components/themed-text';
-import { Borders, Fonts, FolderColors, Spacing } from '@/constants/theme';
+import { Fonts, FolderColors, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { useVibe } from '@/hooks/use-vibe';
 import { parseSummaryBullets } from '@/lib/summary';
 import type { Bookmark, Folder } from '@/lib/types';
 
@@ -22,12 +23,16 @@ type Props = {
 
 export function BookmarkCard({ bookmark, folder, compact, onPress, onLongPress }: Props) {
   const theme = useTheme();
+  const vibe = useVibe();
 
+  // Only the retro vibe gets the playful sticker-tilt. Other vibes (glass,
+  // minimal, clay, brutalist) stay axis-aligned.
   const rotation = useMemo(() => {
+    if (!vibe.showDecorations) return 0;
     const seed = bookmark.id;
     const t = ((seed * 9301 + 49297) % 233280) / 233280;
     return (t - 0.5) * 2;
-  }, [bookmark.id]);
+  }, [bookmark.id, vibe.showDecorations]);
 
   const tapeColor = useMemo(() => {
     const colors = ['#FFE45C', '#FF9DC5', '#7BB7FF', '#7FE0B8'];
@@ -41,9 +46,9 @@ export function BookmarkCard({ bookmark, folder, compact, onPress, onLongPress }
 
   return (
     <Animated.View
-      entering={FadeInDown.duration(280).springify().damping(18)}
       layout={LinearTransition.duration(220)}
       style={[styles.outer, compact && styles.outerCompact]}>
+      <Animated.View entering={FadeInDown.duration(280).springify().damping(18)}>
       <Pressable
         onPress={onPress}
         onLongPress={onLongPress}
@@ -58,10 +63,16 @@ export function BookmarkCard({ bookmark, folder, compact, onPress, onLongPress }
         ]}>
         <Sticker
           background={theme.backgroundElement}
-          style={[styles.card, compact && styles.cardCompact]}
+          style={[
+            styles.card,
+            compact && styles.cardCompact,
+            // Retro keeps the roomy sticker padding; tighter vibes
+            // (minimal, glass, clay, brutalist) feel bloated with it.
+            !vibe.showDecorations && (compact ? styles.cardCompactTight : styles.cardTight),
+          ]}
           shadowOffset={compact ? 3 : 4}>
 
-          {visibleTags.length > 0 ? (
+          {visibleTags.length > 0 && !compact ? (
             <View style={styles.tagRow}>
               {visibleTags.map((tag) => (
                 <MarkerTag key={tag} label={tag} size="sm" />
@@ -70,7 +81,12 @@ export function BookmarkCard({ bookmark, folder, compact, onPress, onLongPress }
                 <View
                   style={[
                     styles.overflow,
-                    { borderColor: theme.border, backgroundColor: theme.backgroundSelected },
+                    {
+                      borderColor: theme.border,
+                      backgroundColor: theme.backgroundSelected,
+                      borderWidth: vibe.borderWidth > 0 ? 1 : 0,
+                      borderRadius: vibe.radiusSmall,
+                    },
                   ]}>
                   <ThemedText style={[styles.overflowText, { color: theme.text }]}>
                     +{overflow}
@@ -81,10 +97,22 @@ export function BookmarkCard({ bookmark, folder, compact, onPress, onLongPress }
           ) : null}
 
           {bookmark.thumbnail ? (
-            <View style={[styles.thumbWrap, { borderColor: theme.border }]}>
+            <View
+              style={[
+                styles.thumbWrap,
+                {
+                  borderColor: theme.border,
+                  borderWidth: vibe.borderWidth > 0 ? 1 : 0,
+                  borderRadius: vibe.radiusSmall,
+                },
+              ]}>
               <Image
                 source={{ uri: bookmark.thumbnail }}
-                style={[styles.thumb, compact && styles.thumbCompact]}
+                style={[
+                  styles.thumb,
+                  compact && styles.thumbCompact,
+                  { borderRadius: vibe.radiusSmall },
+                ]}
                 contentFit="cover"
                 transition={200}
               />
@@ -115,7 +143,11 @@ export function BookmarkCard({ bookmark, folder, compact, onPress, onLongPress }
                 <View
                   style={[
                     styles.folderStripe,
-                    { backgroundColor: FolderColors[folder.color] },
+                    {
+                      backgroundColor: FolderColors[folder.color],
+                      borderWidth: vibe.borderWidth > 0 ? 1 : 0,
+                      borderRadius: vibe.radiusSmall,
+                    },
                   ]}
                 />
                 <ThemedText
@@ -134,6 +166,7 @@ export function BookmarkCard({ bookmark, folder, compact, onPress, onLongPress }
           rotate={rotation > 0 ? -10 : 10}
         />
       </Pressable>
+      </Animated.View>
     </Animated.View>
   );
 }
@@ -150,19 +183,32 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.one,
   },
   card: {
-    padding: Spacing.three,
+    padding: Spacing.four,
     gap: Spacing.three,
+    overflow: 'hidden',
   },
   cardCompact: {
-    padding: Spacing.two,
+    padding: Spacing.three,
     gap: Spacing.two,
+    overflow: 'hidden',
+    // Cap card height in grid mode so a long summary doesn't make this card
+    // dwarf the one next to it in its column.
+    maxHeight: 220,
+  },
+  // Non-retro vibe overrides — tighter padding so cards don't feel bloated
+  // outside the playful sticker aesthetic.
+  cardTight: {
+    padding: Spacing.three,
+  },
+  cardCompactTight: {
+    padding: Spacing.two,
   },
   thumbCompact: {
-    aspectRatio: 4 / 3,
+    aspectRatio: 16 / 9,
   },
   titleCompact: {
-    fontSize: 18,
-    lineHeight: 22,
+    fontSize: 14,
+    lineHeight: 17,
   },
   tagRow: {
     flexDirection: 'row',
@@ -170,7 +216,6 @@ const styles = StyleSheet.create({
     gap: Spacing.two,
   },
   overflow: {
-    borderWidth: Borders.thin,
     paddingHorizontal: 6,
     paddingVertical: 2,
     justifyContent: 'center',
@@ -181,7 +226,6 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   thumbWrap: {
-    borderWidth: Borders.thick,
     overflow: 'hidden',
   },
   thumb: {
@@ -214,7 +258,6 @@ const styles = StyleSheet.create({
   folderStripe: {
     width: 14,
     height: 14,
-    borderWidth: Borders.thin,
     borderColor: '#0A0A0A',
   },
   folderName: {

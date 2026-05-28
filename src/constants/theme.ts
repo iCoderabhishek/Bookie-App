@@ -148,6 +148,106 @@ export const ThemeMeta: Record<ThemeKey, { label: string; tagline: string }> = {
 
 export const DEFAULT_THEME: ThemeKey = 'cream';
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Vibes — full aesthetic systems. Vibe controls the FORM (borders, shadows,
+// radii, decoration density), palette controls the COLOR.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type VibeKey = 'retro' | 'glass' | 'minimal' | 'clay' | 'brutalist';
+
+export type ShadowStyle = 'hard' | 'soft' | 'none';
+
+export type VibeForm = {
+  borderWidth: number;
+  shadowStyle: ShadowStyle;
+  shadowOffset: number;
+  shadowOpacity: number;
+  shadowBlur: number;
+  radius: number;
+  radiusSmall: number;
+  showDecorations: boolean;
+  surfaceOpacity: number;
+  pressTranslate: number;
+};
+
+export const Vibes: Record<VibeKey, VibeForm> = {
+  retro: {
+    borderWidth: 2.5,
+    shadowStyle: 'hard',
+    shadowOffset: 4,
+    shadowOpacity: 1,
+    shadowBlur: 0,
+    radius: 4,
+    radiusSmall: 2,
+    showDecorations: true,
+    surfaceOpacity: 1,
+    pressTranslate: 4,
+  },
+  glass: {
+    borderWidth: 1,
+    shadowStyle: 'soft',
+    shadowOffset: 6,
+    shadowOpacity: 0.18,
+    shadowBlur: 18,
+    radius: 18,
+    radiusSmall: 12,
+    showDecorations: false,
+    surfaceOpacity: 0.55,
+    pressTranslate: 0,
+  },
+  minimal: {
+    borderWidth: 1,
+    shadowStyle: 'none',
+    shadowOffset: 0,
+    shadowOpacity: 0,
+    shadowBlur: 0,
+    radius: 8,
+    radiusSmall: 4,
+    showDecorations: false,
+    surfaceOpacity: 1,
+    pressTranslate: 0,
+  },
+  clay: {
+    borderWidth: 0,
+    shadowStyle: 'soft',
+    shadowOffset: 8,
+    shadowOpacity: 0.22,
+    shadowBlur: 22,
+    radius: 24,
+    radiusSmall: 14,
+    showDecorations: false,
+    surfaceOpacity: 1,
+    pressTranslate: 2,
+  },
+  brutalist: {
+    borderWidth: 4,
+    shadowStyle: 'none',
+    shadowOffset: 0,
+    shadowOpacity: 0,
+    shadowBlur: 0,
+    radius: 0,
+    radiusSmall: 0,
+    showDecorations: false,
+    surfaceOpacity: 1,
+    pressTranslate: 0,
+  },
+};
+
+export const VibeMeta: Record<
+  VibeKey,
+  { label: string; tagline: string }
+> = {
+  retro: { label: 'Retro', tagline: 'sticker zine — the original' },
+  glass: { label: 'Glass', tagline: 'frosted liquid panels' },
+  minimal: { label: 'Minimal', tagline: 'hairlines and whitespace' },
+  clay: { label: 'Clay', tagline: 'soft tactile 3D' },
+  brutalist: { label: 'Brutalist', tagline: 'mono · sharp · loud' },
+};
+
+export const VibeOrder: VibeKey[] = ['retro', 'glass', 'minimal', 'clay', 'brutalist'];
+
+export const DEFAULT_VIBE: VibeKey = 'retro';
+
 // Back-compat alias — most code still imports `Colors`.
 // `Colors.light` and `Colors.dark` remain available; new screens prefer `useTheme()`.
 export const Colors = {

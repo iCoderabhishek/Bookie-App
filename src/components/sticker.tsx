@@ -1,8 +1,9 @@
 import { forwardRef, type ReactNode } from 'react';
 import { Platform, StyleSheet, View, type ViewProps, type ViewStyle } from 'react-native';
 
-import { Borders, Radius, Shadows } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { useVibe } from '@/hooks/use-vibe';
+import { withAlpha } from '@/lib/color';
 
 type StickerProps = ViewProps & {
   children?: ReactNode;
@@ -22,9 +23,9 @@ export const Sticker = forwardRef<View, StickerProps>(function Sticker(
     background,
     borderColor,
     shadowColor,
-    shadowOffset = Shadows.hard.offset,
-    borderWidth = Borders.thick,
-    radius = Radius.md,
+    shadowOffset,
+    borderWidth,
+    radius,
     rotate,
     flat = false,
     style,
@@ -33,24 +34,17 @@ export const Sticker = forwardRef<View, StickerProps>(function Sticker(
   ref,
 ) {
   const theme = useTheme();
-  const bg = background ?? theme.backgroundElement;
-  const bc = borderColor ?? theme.border;
-  const sc = shadowColor ?? theme.shadow;
+  const vibe = useVibe();
 
-  const shadowStyle: ViewStyle = flat
-    ? {}
-    : Platform.select<ViewStyle>({
-        web: {
-          boxShadow: `${shadowOffset}px ${shadowOffset}px 0 0 ${sc}`,
-        },
-        default: {
-          shadowColor: sc,
-          shadowOffset: { width: shadowOffset, height: shadowOffset },
-          shadowOpacity: 1,
-          shadowRadius: 0,
-          elevation: 0,
-        },
-      }) ?? {};
+  const rawBg = background ?? theme.backgroundElement;
+  const bg = vibe.surfaceOpacity < 1 ? withAlpha(rawBg, vibe.surfaceOpacity) : rawBg;
+  const bw = borderWidth ?? vibe.borderWidth;
+  const bc = bw > 0 ? (borderColor ?? theme.border) : 'transparent';
+  const sc = shadowColor ?? theme.shadow;
+  const r = radius ?? vibe.radius;
+  const off = shadowOffset ?? vibe.shadowOffset;
+
+  const shadowStyle = flat ? {} : buildShadow(vibe.shadowStyle, off, sc, vibe);
 
   return (
     <View
@@ -60,8 +54,8 @@ export const Sticker = forwardRef<View, StickerProps>(function Sticker(
         {
           backgroundColor: bg,
           borderColor: bc,
-          borderWidth,
-          borderRadius: radius,
+          borderWidth: bw,
+          borderRadius: r,
         },
         shadowStyle,
         rotate ? { transform: [{ rotate: `${rotate}deg` }] } : null,
@@ -72,6 +66,42 @@ export const Sticker = forwardRef<View, StickerProps>(function Sticker(
     </View>
   );
 });
+
+function buildShadow(
+  kind: 'hard' | 'soft' | 'none',
+  offset: number,
+  color: string,
+  vibe: { shadowOpacity: number; shadowBlur: number },
+): ViewStyle {
+  if (kind === 'none') return {};
+  if (kind === 'hard') {
+    return Platform.select<ViewStyle>({
+      web: {
+        boxShadow: `${offset}px ${offset}px 0 0 ${color}`,
+      },
+      default: {
+        shadowColor: color,
+        shadowOffset: { width: offset, height: offset },
+        shadowOpacity: 1,
+        shadowRadius: 0,
+        elevation: 0,
+      },
+    }) ?? {};
+  }
+  // soft (glass / clay)
+  return Platform.select<ViewStyle>({
+    web: {
+      boxShadow: `0 ${offset}px ${vibe.shadowBlur}px rgba(0,0,0,${vibe.shadowOpacity})`,
+    },
+    default: {
+      shadowColor: '#000000',
+      shadowOffset: { width: 0, height: offset },
+      shadowOpacity: vibe.shadowOpacity,
+      shadowRadius: vibe.shadowBlur,
+      elevation: Math.round(offset),
+    },
+  }) ?? {};
+}
 
 const styles = StyleSheet.create({
   base: {

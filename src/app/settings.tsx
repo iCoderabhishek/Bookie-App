@@ -9,7 +9,9 @@ import {
   FolderSimple,
   NotePencil,
   Palette,
+  Sparkle,
   User as UserIcon,
+  XLogo,
 } from 'phosphor-react-native';
 import { useEffect, useState } from 'react';
 import {
@@ -36,7 +38,12 @@ import {
   Spacing,
   ThemeMeta,
   Themes,
+  VibeMeta,
+  VibeOrder,
+  Vibes,
   type ThemeKey,
+  type ThemePalette,
+  type VibeKey,
 } from '@/constants/theme';
 import {
   FOLLOW_SYSTEM_KEY,
@@ -47,11 +54,13 @@ import { getSetting, setSetting } from '@/lib/db';
 
 const NAME_KEY = 'user_name';
 const SUPPORT_EMAIL = 'iamabhishek1310@gmail.com';
+const X_HANDLE = '0bhishek';
+const X_URL = `https://x.com/${X_HANDLE}`;
 
 export default function SettingsScreen() {
   const router = useRouter();
   const theme = useTheme();
-  const { themeKey, setThemeKey } = useThemeContext();
+  const { themeKey, setThemeKey, vibeKey, setVibeKey } = useThemeContext();
   const [name, setName] = useState('');
   const [nameStatus, setNameStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
 
@@ -141,8 +150,27 @@ export default function SettingsScreen() {
             </Sticker>
           </Section>
 
-          {/* Themes */}
-          <Section icon={<Palette size={20} color={theme.text} weight="duotone" />} title="THEME">
+          {/* Vibes — chooses the visual form (borders, shadows, decorations) */}
+          <Section icon={<Sparkle size={20} color={theme.text} weight="duotone" />} title="VIBES">
+            <ThemedText
+              style={[styles.copy, { color: theme.textSecondary, fontFamily: Fonts.sans }]}>
+              the look + feel. colors below.
+            </ThemedText>
+            <View style={styles.themeGrid}>
+              {VibeOrder.map((v) => (
+                <VibeCard
+                  key={v}
+                  vibeKey={v}
+                  active={vibeKey === v}
+                  onPress={() => setVibeKey(v)}
+                  palette={theme}
+                />
+              ))}
+            </View>
+          </Section>
+
+          {/* Colors — chooses palette within the current vibe */}
+          <Section icon={<Palette size={20} color={theme.text} weight="duotone" />} title="COLORS">
             <View style={styles.themeGrid}>
               <ThemeCard
                 paletteKey={'__system__' as ThemeKey}
@@ -218,6 +246,31 @@ export default function SettingsScreen() {
             </ThemedText>
           </Section>
 
+          {/* Follow on X */}
+          <Section icon={<XLogo size={20} color={theme.text} weight="duotone" />} title="FOLLOW">
+            <ThemedText
+              style={[styles.copy, { color: theme.textSecondary, fontFamily: Fonts.sans }]}>
+              built by abhishek — say hi, share what you're using bookie for,
+              or just shitpost together.
+            </ThemedText>
+            <StickerButton
+              onPress={() => Linking.openURL(X_URL).catch(() => {})}
+              background={theme.text}
+              radius={Radius.md}
+              padding={Spacing.three}>
+              <View style={styles.ctaInner}>
+                <XLogo size={20} color={theme.background} weight="fill" />
+                <ThemedText
+                  style={[
+                    styles.cta,
+                    { color: theme.background, fontFamily: Fonts.display },
+                  ]}>
+                  @{X_HANDLE}
+                </ThemedText>
+              </View>
+            </StickerButton>
+          </Section>
+
           {/* About */}
           <Section icon={<Devices size={20} color={theme.text} weight="duotone" />} title="ABOUT">
             <Sticker background={theme.backgroundElement} style={styles.aboutSticker}>
@@ -227,8 +280,7 @@ export default function SettingsScreen() {
               </ThemedText>
               <ThemedText
                 style={[styles.aboutSub, { color: theme.textSecondary, fontFamily: Fonts.sans }]}>
-                {Device.modelName ?? 'unknown device'} · {Platform.OS}{' '}
-                {Platform.Version}
+                {Device.modelName ?? 'unknown device'} · {formatOS()}
               </ThemedText>
             </Sticker>
           </Section>
@@ -345,6 +397,116 @@ function ThemeCard({
   );
 }
 
+function VibeCard({
+  vibeKey,
+  active,
+  onPress,
+  palette,
+}: {
+  vibeKey: VibeKey;
+  active: boolean;
+  onPress: () => void;
+  palette: ThemePalette;
+}) {
+  const meta = VibeMeta[vibeKey];
+  const form = Vibes[vibeKey];
+
+  // Preview tile renders using THIS vibe's form so the user sees what they'll get.
+  const previewShadow = form.shadowStyle === 'hard'
+    ? {
+        shadowColor: palette.shadow,
+        shadowOffset: { width: form.shadowOffset, height: form.shadowOffset },
+        shadowOpacity: 1,
+        shadowRadius: 0,
+      }
+    : form.shadowStyle === 'soft'
+    ? {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: form.shadowOffset },
+        shadowOpacity: form.shadowOpacity,
+        shadowRadius: form.shadowBlur,
+        elevation: Math.round(form.shadowOffset),
+      }
+    : {};
+
+  return (
+    <Pressable onPress={onPress} style={styles.themeCardWrap}>
+      <View
+        style={[
+          styles.vibePreview,
+          {
+            backgroundColor: palette.backgroundElement,
+            borderColor: form.borderWidth > 0 ? palette.border : 'transparent',
+            borderWidth: active ? Math.max(form.borderWidth, 2) + 1 : form.borderWidth,
+            borderRadius: form.radius,
+          },
+          previewShadow,
+        ]}>
+          <View style={styles.vibePreviewInner}>
+            <View
+              style={[
+                styles.vibeMiniBlock,
+                {
+                  backgroundColor: palette.primary,
+                  borderRadius: form.radiusSmall,
+                },
+              ]}
+            />
+            <View
+              style={[
+                styles.vibeMiniBlock,
+                {
+                  backgroundColor: palette.accent,
+                  borderRadius: form.radiusSmall,
+                  width: '70%',
+                },
+              ]}
+            />
+            <View
+              style={[
+                styles.vibeMiniBlock,
+                {
+                  backgroundColor: palette.backgroundSelected,
+                  borderRadius: form.radiusSmall,
+                  width: '40%',
+                },
+              ]}
+            />
+          </View>
+          <ThemedText
+            style={[
+              styles.themeLabel,
+              { color: palette.text, fontFamily: Fonts.display },
+            ]}>
+            {meta.label.toUpperCase()}
+          </ThemedText>
+          <ThemedText
+            style={[
+              styles.themeTag,
+              { color: palette.textSecondary, fontFamily: Fonts.sans },
+            ]}>
+            {meta.tagline}
+          </ThemedText>
+          {active ? (
+            <View
+              style={[
+                styles.activeBadge,
+                { backgroundColor: palette.primary, borderColor: palette.border },
+              ]}>
+              <ThemedText
+                style={[
+                  styles.activeBadgeText,
+                  { color: palette.textOnPrimary, fontFamily: Fonts.display },
+                ]}>
+                ON
+              </ThemedText>
+            </View>
+          ) : null}
+      </View>
+    </Pressable>
+  );
+}
+
 function NavTile({
   icon,
   label,
@@ -374,6 +536,18 @@ function NavTile({
   );
 }
 
+/**
+ * Friendly OS string. `Platform.Version` on Android returns the SDK API
+ * level (e.g. `30` = Android 11), which is meaningless to a user. We
+ * prefer expo-device's `osVersion` which returns the actual release
+ * version string (e.g. `"11"`), and capitalize the platform name.
+ */
+const formatOS = (): string => {
+  const version = Device.osVersion ?? String(Platform.Version);
+  const name = Platform.OS === 'ios' ? 'iOS' : Platform.OS === 'android' ? 'Android' : Platform.OS;
+  return `${name} ${version}`;
+};
+
 const buildSupportBody = (name: string) => {
   const lines = [
     `Hi Abhishek,`,
@@ -384,7 +558,7 @@ const buildSupportBody = (name: string) => {
     name ? `From: ${name}` : `From: (unnamed user)`,
     `App: Bookie v${Constants.expoConfig?.version ?? '1.0.0'}`,
     `Device: ${Device.manufacturer ?? '?'} ${Device.modelName ?? '?'}`,
-    `OS: ${Platform.OS} ${Platform.Version}`,
+    `OS: ${formatOS()}`,
     `Locale: ${Constants.systemFonts?.length ? 'native' : 'web'}`,
   ];
   return lines.join('\n');
@@ -461,6 +635,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: Spacing.three,
+  },
+  vibePreview: {
+    padding: Spacing.three,
+    gap: Spacing.two,
+    minHeight: 130,
+  },
+  vibePreviewInner: {
+    gap: 6,
+  },
+  vibeMiniBlock: {
+    height: 8,
+    width: '100%',
   },
   themeCardWrap: {
     width: '47%',

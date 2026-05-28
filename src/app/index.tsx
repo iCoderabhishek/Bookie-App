@@ -30,13 +30,13 @@ import Animated, {
 } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { BookieLogo } from '@/components/bookie-logo';
 import { BookmarkCard } from '@/components/bookmark-card';
 import { ConfirmModal } from '@/components/confirm-modal';
 import { LayoutChooser, type FeedLayout } from '@/components/layout-chooser';
 import { NoteCard } from '@/components/note-card';
 import { Sticker } from '@/components/sticker';
 import { StickerButton } from '@/components/sticker-button';
-import { TapeStrip } from '@/components/tape-strip';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { TodoPin } from '@/components/todo-pin';
@@ -287,19 +287,7 @@ export default function HomeScreen() {
       <SafeAreaView style={styles.flex} edges={['top', 'left', 'right']}>
         <View style={styles.header}>
           <View style={styles.headerLeft}>
-            <View style={styles.brandRow}>
-              <ThemedText
-                style={[styles.brand, { color: theme.text, fontFamily: Fonts.display }]}>
-                BOOKIE
-              </ThemedText>
-              <TapeStrip
-                color={theme.primary}
-                width={56}
-                height={14}
-                rotate={-4}
-                style={{ marginLeft: -8, marginTop: 14 }}
-              />
-            </View>
+            <BookieLogo size={32} />
             <ThemedText
               style={[styles.tagline, { color: theme.textSecondary, fontFamily: Fonts.marker }]}>
               a scrapbook for your brain
@@ -426,6 +414,37 @@ export default function HomeScreen() {
           />
         ) : filtered.length === 0 ? (
           <EmptyState title="NO MATCHES" hint="try a different word or folder" />
+        ) : isWall ? (
+          // Masonry layout: distribute items round-robin into N columns.
+          // Each column stacks its items vertically, so a tall card in one
+          // column doesn't force empty space below the neighbouring shorter
+          // card (which is what numColumns on a FlatList would do).
+          <Animated.ScrollView
+            key={`${layout}-${numColumns}`}
+            contentContainerStyle={styles.list}
+            keyboardShouldPersistTaps="handled"
+            onScroll={scrollHandler}
+            scrollEventThrottle={16}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+                tintColor={theme.primary}
+                colors={[theme.primary]}
+              />
+            }>
+            <View style={styles.wallRow}>
+              {Array.from({ length: numColumns }).map((_, colIdx) => (
+                <View key={colIdx} style={styles.wallColumn}>
+                  {filtered
+                    .filter((_, i) => i % numColumns === colIdx)
+                    .map((item) => (
+                      <View key={feedKey(item)}>{renderItem({ item })}</View>
+                    ))}
+                </View>
+              ))}
+            </View>
+          </Animated.ScrollView>
         ) : (
           <Animated.FlatList
             key={`${layout}-${numColumns}`}
@@ -435,8 +454,6 @@ export default function HomeScreen() {
             keyboardShouldPersistTaps="handled"
             onScroll={scrollHandler}
             scrollEventThrottle={16}
-            numColumns={numColumns}
-            columnWrapperStyle={isWall ? styles.wallRow : undefined}
             refreshControl={
               <RefreshControl
                 refreshing={refreshing}
@@ -643,15 +660,6 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: Spacing.one,
   },
-  brandRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-  },
-  brand: {
-    fontSize: 32,
-    lineHeight: 48,
-    letterSpacing: -1.5,
-  },
   tagline: {
     fontSize: 12,
     marginTop: 2,
@@ -739,8 +747,14 @@ const styles = StyleSheet.create({
     paddingBottom: Spacing.six * 2,
   },
   wallRow: {
+    flexDirection: 'row',
     gap: Spacing.two,
     paddingHorizontal: 0,
+    alignItems: 'flex-start',
+  },
+  wallColumn: {
+    flex: 1,
+    gap: 0,
   },
   empty: {
     flex: 1,
