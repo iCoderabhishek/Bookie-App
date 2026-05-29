@@ -34,7 +34,7 @@ export function streamProcess(urls: string[], h: StreamHandlers): () => void {
     }
   };
 
-  console.log('[api] POST', `${API_BASE_URL}/api/v1/process`);
+  if (__DEV__) console.log('[api] POST', `${API_BASE_URL}/api/v1/process`);
   xhr.open('POST', `${API_BASE_URL}/api/v1/process`);
   xhr.setRequestHeader('Content-Type', 'application/json');
   // Backend allows up to 10 URLs * 10s fetch + AI summarisation; 90s is a comfortable ceiling.

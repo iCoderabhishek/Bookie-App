@@ -12,12 +12,13 @@ const root = join(here, '..');
 const svgIn = (name) => readFileSync(join(here, name));
 const pngOut = (name) => join(root, 'assets', 'images', name);
 
+// NOTE: the app icon, adaptive foreground/background, and splash are hand-made
+// AI assets referenced directly in app.json as bookie-*.png. They are intentionally
+// NOT generated here, so running this script will never overwrite them.
+// Only the Android themed-icon monochrome silhouette and the web favicon are
+// still rasterized from the SVG source.
 const targets = [
-  { svg: 'icon.svg', png: 'icon.png', size: 1024 },
-  { svg: 'icon-foreground.svg', png: 'android-icon-foreground.png', size: 1024 },
-  { svg: 'icon-background.svg', png: 'android-icon-background.png', size: 1024 },
   { svg: 'icon-monochrome.svg', png: 'android-icon-monochrome.png', size: 1024 },
-  { svg: 'splash.svg', png: 'splash-icon.png', size: 1024 },
   { svg: 'icon.svg', png: 'favicon.png', size: 196 },
 ];
 
