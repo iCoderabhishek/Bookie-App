@@ -16,14 +16,20 @@
       "android": {
         "buildType": "apk"
       },
-      "channel": "preview"
+      "env": {
+        "EXPO_PUBLIC_API_BASE_URL": "https://api.getbookie.fun",
+        "EXPO_PUBLIC_API_PROD_URL": "https://api.getbookie.fun"
+      }
     },
     "production": {
       "android": {
         "buildType": "app-bundle"
       },
-      "channel": "production",
-      "autoIncrement": true
+      "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_API_BASE_URL": "https://api.getbookie.fun",
+        "EXPO_PUBLIC_API_PROD_URL": "https://api.getbookie.fun"
+      }
     }
   },
   "submit": {
